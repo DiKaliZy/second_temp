@@ -11,6 +11,7 @@ class Model():
         self.model_name=''     #model file name   (bvh면 motion_name과 동일)
         self.file_type=''       #model 확장자
         self.motion_name = ''  # motion file name
+        self.model_id = ''      #model id number
 
         #focus는 기본적으로 재생 관련 기능 1순위 대상, pinned는 2순위
         self.focused=False      #현재 combo box 선택중인지(삭제, 모션 데이터 교체 대상 등 파일 관련)

@@ -58,11 +58,11 @@ class MainWindow(wx.Frame):
         self.motion_name = wx.StaticText(self.panel)
 
         horizontalbox2.Add(self.model_combobox, 10, wx.ALIGN_LEFT | wx.RIGHT, 10)
-        horizontalbox2.Add(self.del_button, 0, flag = wx.RIGHT, border = 10)
-        horizontalbox2.Add(model_name_label, flag = wx.Bottom)
-        horizontalbox2.Add(self.model_name, flag=wx.Bottom | wx.Center)
-        horizontalbox2.Add(motion_name_label, flag= wx.Bottom | wx.LEFT, border= 170)
-        horizontalbox2.Add(self.motion_name, flag=wx.Bottom | wx.ALIGN_RIGHT)
+        horizontalbox2.Add(self.del_button, 0, flag = wx.RIGHT, border = 20)
+        horizontalbox2.Add(model_name_label, flag = wx.Center)
+        horizontalbox2.Add(self.model_name, flag= wx.Center)
+        horizontalbox2.Add(motion_name_label, flag= wx.Center | wx.LEFT, border= 170)
+        horizontalbox2.Add(self.motion_name, flag=wx.Center | wx.ALIGN_RIGHT)
         verticalbox.Add(horizontalbox2, 2, wx.ALIGN_LEFT | wx.LEFT | wx.RIGHT, 10)
 
         #slider 출력, check box - pin check: pin 설정 해 놓으면 해당 model은 재생 관련 control 같이 수행
@@ -73,7 +73,7 @@ class MainWindow(wx.Frame):
         self.pin_check.SetValue(False)
 
         horizontalbox3.Add(self.play_slider, wx.EXPAND)
-        horizontalbox3.Add(self.pin_check, 0, wx.ALIGN_RIGHT | wx.ALIGN_CENTER)
+        horizontalbox3.Add(self.pin_check, 0, flag = wx.ALIGN_RIGHT | wx.ALIGN_CENTER, border = 10)
         verticalbox.Add(horizontalbox3, 2, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         #재생 시작 frame, 재생 종료 frame 설정, frame 재생 영역 설정 적용(refresh), 모델 bvh로 내보내기

@@ -5,6 +5,7 @@ class File_Drop(wx.FileDropTarget):
     def __init__(self, frame):
         super().__init__()
         self.frame = frame
+        self.model_id = 0   #동일 이름 파일 다중 loading 시 구분하기 위한 id number
 
     def OnDropFiles(self, x, y, filenames):
         for file_root in reversed(filenames):
@@ -26,7 +27,7 @@ class File_Drop(wx.FileDropTarget):
                 index = index+1
 
             if file_type == 'bvh':
-                new_model = self.bvh_file_read(file_name, file_root)
+                new_model = self.bvh_file_read(file_name, file_root, self.model_id)
                 #bvh file 확인
                 #new_model.print_hierarchy(new_model.joint_root)
                 #for joint in new_model.joint:
@@ -36,23 +37,25 @@ class File_Drop(wx.FileDropTarget):
 
             #elif file_type == 'amc':
 
-            print('type: ', file_type)
-            print('name: ', file_name)
+            print('type: ', new_model.file_type)
+            print('name: ', new_model.model_name)
 
+            self.model_id += 1
         return True
 
 #파일 읽었을 때 data 생성
     #bvh
-    def bvh_file_read(self, file_name, file_root):
+    def bvh_file_read(self, file_name, file_root, model_id):
         #model object 정의 및 파일 정보 기록
         new_model = model_elem.Model()
         new_model.file_type = 'bvh'
-        new_model.motion_name = file_name
-        new_model.model_name = file_name
+        new_model.motion_name = file_name + "_" + str(model_id)
+        new_model.model_name = file_name + "_" + str(model_id)
+        new_model.model_id = str(model_id)
 
         #model object data 저장소 및 프로그램에 등록
         self.frame.models.model_list.append(new_model)
-        self.frame.name_list.append(file_name)
+        self.frame.name_list.append(new_model.model_name)
         self.frame.model_combobox.Clear()
         self.frame.model_combobox.Set(self.frame.name_list)
 

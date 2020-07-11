@@ -26,8 +26,8 @@ class GLCanvasBase(glcanvas.GLCanvas):
         self.pause = False
         self.timer = wx.Timer(self)
 
-        self.skeleton_view = True   #line으로 골격만 표현
-        self.frame_view = True      #mesh, frame 설정
+        self.skeleton_view = False   #line으로 골격만 표현
+        self.frame_view = False      #mesh, frame 설정
 
         self.modelID = []
 
@@ -184,13 +184,13 @@ class GLCanvasBase(glcanvas.GLCanvas):
         elif keycode == wx.WXK_DOWN:
             ...
         #mesh/skeleton 전환
-        elif keycode == wx.WXK_TAB:
+        elif keycode == ord('Z'):
             if self.skeleton_view == True:
                 self.skeleton_view = False
             else:
                 self.skeleton_view = True
         # Z키 입력 - polygon / frame 전환
-        elif keycode == ord('Z'):
+        elif keycode == ord('X'):
             if self.frame_view == True:
                 self.frame_view = False
             else:
@@ -265,7 +265,7 @@ class Canvas(GLCanvasBase):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
 
-        gluPerspective(45, 1, 1., 1000)
+        gluPerspective(45, 1., 1., 1000)
 
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
