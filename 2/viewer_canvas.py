@@ -15,7 +15,7 @@ class GLCanvasBase(glcanvas.GLCanvas):
         self.clicked = False
         self.at = np.array([0, 0, 0])
         self.up = np.array([0, 1, 0])
-        self.leng = 100
+        self.leng = 10
         self.azimuth = np.radians(30)
         self.elevation = np.radians(30)
         self.cam = np.array([self.leng * np.sin(self.azimuth), self.leng * np.sin(self.elevation), self.leng * np.cos(self.azimuth)])
@@ -207,11 +207,14 @@ class GLCanvasBase(glcanvas.GLCanvas):
     #마우스 휠 -> 줌인, 줌아웃
     def Wheel(self, event):
         self.getWUV()
-        paramW = self.w * 10
+        paramW = self.w * 5
         #wheel up -> zoom in
         if event.GetWheelRotation() > 0:
-            if np.sqrt(np.dot(self.cam - paramW - self.at, self.cam - paramW - self.at)) > 2:
+            if np.sqrt(np.dot(self.cam - paramW - self.at, self.cam - paramW - self.at)) >= np.sqrt(np.dot(paramW, paramW)):
                 self.cam = self.cam - paramW
+                self.Refresh(False)
+            elif np.sqrt(np.dot(self.cam - self.w - self.at, self.cam - self.w - self.at)) >= 2*np.sqrt(np.dot(self.w, self.w)):
+                self.cam = self.cam - self.w
                 self.Refresh(False)
             else:
                 event.Skip()
@@ -245,6 +248,7 @@ class GLCanvasBase(glcanvas.GLCanvas):
 class Canvas(GLCanvasBase):
 
     def InitGL(self):
+
         self.glDict = {}
         self.model_list = self.frame.models.model_list
 
@@ -254,19 +258,23 @@ class Canvas(GLCanvasBase):
 
         glShadeModel(GL_SMOOTH)
         glClearColor(0.96,0.96,0.9,1.)
-        glClearDepth(1.)
-        glEnable(GL_DEPTH_TEST)
 
         glEnable(GL_CULL_FACE)
-        glCullFace(GL_BACK)
-        #glFrontFace(GL_CCW)
+        #glCullFace(GL_BACK)
+
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
 
-        gluPerspective(45, 1, 1, 1000)
+        gluPerspective(45, 1, 1., 1000)
+
+        glDepthFunc(GL_LESS)
+        glEnable(GL_DEPTH_TEST)
+        glDepthMask(GL_TRUE)
+        glClearDepth(1.)
 
     def OnDraw(self):
-        gridscale = 10
+        gridlane = 10
+        gridscale = 1
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
@@ -275,10 +283,10 @@ class Canvas(GLCanvasBase):
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         #draw checker_box
-        for i in range(-2 * gridscale, 2 * gridscale + 1):
-            for j in range(-2 * gridscale, 2 * gridscale + 1):
+        for i in range(-2 * gridlane, 2 * gridlane + 1):
+            for j in range(-2 * gridlane, 2 * gridlane + 1):
                 glPushMatrix()
-                glScale(10, 10, 10)
+                glScale(gridscale, gridscale, gridscale)
                 if (j + i) % 2 == 0:
                     glColor3f(1., 1., 1.)
                     glTranslatef(i, 0., j)
@@ -294,11 +302,11 @@ class Canvas(GLCanvasBase):
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         #glEnable(GL_POLYGON_OFFSET_LINE)
         glBegin(GL_LINES)
-        for i in range(-2 * gridscale, gridscale * 2 + 2):
-            glVertex3fv(np.array([i * 10, 0.001, gridscale * 20]))
-            glVertex3fv(np.array([i * 10, 0.001, gridscale * -20]))
-            glVertex3fv(np.array([gridscale * 20, 0.001, 10 * i]))
-            glVertex3fv(np.array([gridscale * -20, 0.001, 10 * i]))
+        for i in range(-2 * gridlane, gridlane * 2 + 2):
+            glVertex3fv(np.array([i * gridscale, 0.001, gridlane * gridscale * 2 + 1]))
+            glVertex3fv(np.array([i * gridscale, 0.001, gridlane * -gridscale * 2]))
+            glVertex3fv(np.array([gridlane * gridscale * 2 + 1, 0.001, gridscale * i]))
+            glVertex3fv(np.array([gridlane * -gridscale * 2, 0.001, gridscale * i]))
         glEnd()
 
         glEnable(GL_LIGHTING)
@@ -363,6 +371,12 @@ class Canvas(GLCanvasBase):
                 glColor3ub(200, 200, 200)
                 end = np.array(child.offset)
                 if self.skeleton_view == True:
+                    if nowsee.model.focused == True:
+                        glColor3f(0.9,0.3,0.3)
+                    elif nowsee.model.pinned == True:
+                        glColor3f(0.3, 0.9, 0.3)
+                    else:
+                        pass
                     mesh.draw_mesh("LINE", start=start, end=end)
                 else:
                     parent2child = end - start
@@ -386,7 +400,7 @@ class Canvas(GLCanvasBase):
                     #재생 조작 선택 대상 윤곽선 그리기
                     if nowsee.model.focused == True:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                        glColor3f(0.9, 0.9, 0.3)
+                        glColor3f(0.9, 0.3, 0.3)
                         mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=1)
                     elif nowsee.model.pinned == True:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
