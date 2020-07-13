@@ -114,6 +114,7 @@ class File_Drop(wx.FileDropTarget):
                     self.frame.models.model_list.pop(-1)
                     return None
 
+            #motion
             elif is_it_hierarchy == False:
                 if line[0] == "Frames":
                     new_model.max_frame = int(line[1]) - 1
@@ -123,4 +124,9 @@ class File_Drop(wx.FileDropTarget):
                 elif line[0] != "MOTION":
                     motion_per_frame = list(map(float, line))
                     new_model.bvh_motion_injection(new_model.joint_root, motion_per_frame)
+
+        #관절 global position 계산
+        for joint in new_model.joint:
+            joint.compute_global_joint_pos()
+
         return new_model

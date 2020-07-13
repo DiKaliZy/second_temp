@@ -55,7 +55,7 @@ class Model():
             for child in now_see.child:
                 self.bvh_motion_injection(child, motion_list)
         else:
-            pass
+            now_see.motion_rot.append([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]])
 
 class Joint():
     def __init__(self, name, model):
@@ -63,6 +63,7 @@ class Joint():
         self.model = model    #집합 대상
 
         self.motion_dat = []    #motion data
+        self.scale = 1          #관절 별 size 설정 (현재 관절 -> child 관절로 향하는 부위의 두께 결정)
 
         self.child = []  # hierarchical child
         self.parent = None  # hierarchical parent
@@ -73,6 +74,32 @@ class Joint():
         self.motion_pos = []
         self.offset = []  # joint offset
         self.order = []  # position 및 rotation 순서 (x/y/z 순서)
+
+
+    #각 관절 위치
+    def compute_global_joint_pos(self):
+        temp_axis = []
+        for i in range(len(self.motion_rot)):
+            nowsee = self
+            axis = np.array([0., 0., 0., 1.])
+            while nowsee!=None:
+                temp_t = np.identity(4)
+                temp_r = np.identity(4)
+                temp_t[:3, 3] = nowsee.offset
+                temp_r[:3, :3] = nowsee.motion_rot[i]
+
+                axis = np.dot(temp_r, axis)
+                axis = np.dot(temp_t, axis)
+
+                if nowsee.root == True:
+                    ori = [0., 0., 0., 0.]
+                    ori[:3] = nowsee.motion_pos[i]
+                    axis = axis + ori
+
+                nowsee = nowsee.parent
+            res = np.array(axis[:3])
+            temp_axis.append(res)
+        self.motion_pos = temp_axis
 
     #rotation 및 euler rot angle을 변환하여 저장
     def bvh_separate_motion_dat(self, motion_dat):

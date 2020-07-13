@@ -67,8 +67,7 @@ def draw_mesh(type, start= (), end=None, glDict = None, size= None,
                 glScale(size/10,size/10,size/10)
             elif type == "BOX":
                 length = np.sqrt((np.array(end)-np.array(start)) @ np.transpose(np.array(end)-np.array(start)))
-                area = size/(length*100)
-                glScale(area, length, area)
+                glScale(size/100, length, size/100)
         else:
             if x_size != None:
                 glScalef(x_size, 1, 1)

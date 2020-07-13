@@ -5,10 +5,18 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import numpy as np
 import mesh
+from wx.glcanvas import *
 
 class GLCanvasBase(glcanvas.GLCanvas):
     def __init__(self, parent):
-        glcanvas.GLCanvas.__init__(self, parent, -1)
+
+        #linux ubuntu 환경에서 DEPTH_TEST 제대로 작동시키기 위해 필요한 부분.
+        #왜 이렇게 해야 작동하는지는 모르겠음.
+        #참조 주소 :
+        #https://discuss.wxpython.org/t/opengl-depth-buffer-deosnt-seem-to-work-in-wx-glcanvas/27513/10
+        attribs = [WX_GL_RGBA, WX_GL_DOUBLEBUFFER, WX_GL_DEPTH_SIZE, 24]
+        glcanvas.GLCanvas.__init__(self, parent, -1, attribList=attribs)
+
         self.frame = parent.GetParent()
         self.init = False
         self.shift = False
@@ -249,6 +257,7 @@ class Canvas(GLCanvasBase):
 
     def InitGL(self):
 
+        self.light_pos = [0., 130., 0., 1.]
         self.glDict = {}
         self.model_list = self.frame.models.model_list
 
@@ -267,8 +276,9 @@ class Canvas(GLCanvasBase):
 
         gluPerspective(45, 1., 1., 1000)
 
-        glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
+        #glDepthRange(0, 1)
         glDepthMask(GL_TRUE)
         glClearDepth(1.)
 
@@ -279,6 +289,7 @@ class Canvas(GLCanvasBase):
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
 
+        # gluLookAt(self.light_pos[0], self.light_pos[1], self.light_pos[2], self.at[0], self.at[1], self.at[2], 0, 1, 0)
         gluLookAt(self.cam[0], self.cam[1], self.cam[2], self.at[0], self.at[1], self.at[2], 0, 1, 0)
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
@@ -300,7 +311,7 @@ class Canvas(GLCanvasBase):
         # draw grid
         glColor3f(0.3, 0.3, 0.3)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        #glEnable(GL_POLYGON_OFFSET_LINE)
+
         glBegin(GL_LINES)
         for i in range(-2 * gridlane, gridlane * 2 + 2):
             glVertex3fv(np.array([i * gridscale, 0.001, gridlane * gridscale * 2 + 1]))
@@ -316,7 +327,7 @@ class Canvas(GLCanvasBase):
 
         glLightfv(GL_LIGHT0, GL_AMBIENT, [0.3, 0.3, 0.3, 1.])
         glLightfv(GL_LIGHT0, GL_DIFFUSE, [0.3, 0.3, 0.3, 1.])
-        glLightfv(GL_LIGHT0, GL_POSITION, [-100., 130., 150., 1.])
+        glLightfv(GL_LIGHT0, GL_POSITION, self.light_pos)
         glLightfv(GL_LIGHT0, GL_SPECULAR, [1.,1.,1.,1.])
 
         glEnable(GL_COLOR_MATERIAL)
@@ -334,6 +345,42 @@ class Canvas(GLCanvasBase):
 
         self.SwapBuffers()
 
+    #model별 그림자
+    def draw_shadow(self, model):
+        for joint in model.joint:
+            start = np.array([joint.motion_pos[model.frame][0], 0.0001, joint.motion_pos[model.frame][2]])
+            for child in joint.child:
+                end = np.array([child.motion_pos[model.frame][0], 0.0001, child.motion_pos[model.frame][2]])
+                if self.skeleton_view == True:
+                    mesh.draw_mesh("LINE", start= start, end= end)
+                else:
+                    parent2child = end - start
+                    newy = (parent2child) / np.sqrt((parent2child) @ np.transpose(parent2child))
+                    if newy[0] == 0. and newy[1] == 1. and newy[2] == 0.:
+                        rotmat = np.identity(3)
+                    else:
+                        rotaxis = np.cross(newy, np.array([0, 1, 0]))
+                        rotaxis = rotaxis / np.sqrt(rotaxis @ np.transpose(rotaxis))
+                        newz = np.cross(rotaxis, newy)
+                        newz = newz / np.sqrt(newz @ np.transpose(newz))
+                        rotmat = np.column_stack((rotaxis, newy, newz))
+
+                    glPushMatrix()
+                    glTranslatef(start[0] + parent2child[0] / 2, 0.0001, start[2] + parent2child[2] / 2)
+
+                    mat = np.identity(4)
+                    mat[:3, :3] = rotmat
+                    glMultMatrixf(mat.T)
+
+                    a = child.motion_pos[model.frame][0] - joint.motion_pos[model.frame][0]
+                    b = child.motion_pos[model.frame][2] - joint.motion_pos[model.frame][2]
+
+                    mesh.draw_mesh("BOX",
+                                   start=np.array([0, 0, 0]),
+                                   end=np.array([a,0,b]),
+                                   glDict=self.glDict, size=joint.scale)
+                    glPopMatrix()
+
     #모델 그리기
     def draw_model(self):
         if len(self.model_list) > 0 :
@@ -344,9 +391,19 @@ class Canvas(GLCanvasBase):
                 glTranslatef(model.model_origin[0], model.model_origin[1], model.model_origin[2])
                 #model scal 보정
                 glScalef(model.model_scale, model.model_scale, model.model_scale)
+
                 #frame당 모션 그리기
                 self.draw_bvh_motion(root)
                 glPopMatrix()
+
+                glPushMatrix()
+                #그림자 그리기 위해 lighting 제거
+                glDisable(GL_LIGHTING)
+                glColor3f(0.2, 0.2, 0.2)
+                #현재 구현은 단순히 그림자를 xz평면에 각 관절 좌표값을 투영하여 기존 model을 그리듯이 xz 평면 상에 그린 것
+                self.draw_shadow(model)
+                glPopMatrix()
+                glEnable(GL_LIGHTING)
         else:
             glColor3f(0.95, 0.95, 0.95)
             mesh.drawBox()
@@ -363,21 +420,22 @@ class Canvas(GLCanvasBase):
             M[:3, :3] = rot_matrix
             glMultMatrixf(M.T)
 
-            #draw skeleton
             glPushMatrix()
 
             start = np.array([0,0,0])
             for child in nowsee.child:
-                glColor3ub(200, 200, 200)
                 end = np.array(child.offset)
+
+                # draw skeleton
                 if self.skeleton_view == True:
                     if nowsee.model.focused == True:
-                        glColor3f(0.9,0.3,0.3)
+                        glColor3f(0.9, 0.3, 0.3)
                     elif nowsee.model.pinned == True:
                         glColor3f(0.3, 0.9, 0.3)
                     else:
-                        pass
+                        glColor3f(0.5, 0.5, 0.5)
                     mesh.draw_mesh("LINE", start=start, end=end)
+
                 else:
                     parent2child = end - start
                     newy = (parent2child) / np.sqrt((parent2child) @ np.transpose(parent2child))
@@ -395,19 +453,19 @@ class Canvas(GLCanvasBase):
                     mat = np.identity(4)
                     mat[:3, :3] = rotmat
                     glMultMatrixf(mat.T)
-                    mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=1)
 
                     #재생 조작 선택 대상 윤곽선 그리기
                     if nowsee.model.focused == True:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
                         glColor3f(0.9, 0.3, 0.3)
-                        mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=1)
                     elif nowsee.model.pinned == True:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
                         glColor3f(0.3, 0.9, 0.3)
-                        mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=1)
+                    mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=nowsee.scale)
                     if self.frame_view == False:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+                        glColor3f(0.5, 0.5, 0.5)
+                        mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=nowsee.scale)
 
                     glPopMatrix()
                     #total_offset_vec += parent2child

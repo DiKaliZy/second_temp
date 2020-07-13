@@ -1,303 +1,242 @@
-import wx
+# shadow mapping test
+# utkualtinkaya at gmail 
+# shader is from http://www.fabiensanglard.net/shadowmapping/index.php
+
+from OpenGL.GL import *
+from OpenGL.GLU import * 
+from OpenGL.GLUT import *
+from OpenGL.GL.shaders import *
+from OpenGL.GL.framebufferobjects import *
 import sys
+import math
 
-# This working example of the use of OpenGL in the wxPython context
-# was assembled in August 2012 from the GLCanvas.py file found in
-# the wxPython docs-demo package, plus components of that package's
-# run-time environment.
+class Camera:
+    def __init__(self):
+        self.rotx, self.roty = math.pi/4, math.pi/4
+        self.distance = 100
+        self.moving = False
+        self.ex, self.ey = 0, 0
+        self.size = (800, 600) 
 
-# Note that dragging the mouse rotates the view of the 3D cube or cone.
+    def load_matrices(self):
+        glViewport(0, 0, *self.size)
+        y = math.cos(self.roty) * self.distance
+        x = math.sin(self.roty) * math.cos(self.rotx) * self.distance
+        z = math.sin(self.roty) * math.sin(self.rotx) * self.distance
 
-try:
-    from wx import glcanvas
-
-    haveGLCanvas = True
-except ImportError:
-    haveGLCanvas = False
-
-try:
-    # The Python OpenGL package can be found at
-    # http://PyOpenGL.sourceforge.net/
-    from OpenGL.GL import *
-    from OpenGL.GLUT import *
-
-    haveOpenGL = True
-except ImportError:
-    haveOpenGL = False
-
-# ----------------------------------------------------------------------
-
-buttonDefs = {
-    wx.NewId(): ('CubeCanvas', 'Cube'),
-    wx.NewId(): ('ConeCanvas', 'Cone'),
-}
-
-
-class ButtonPanel(wx.Panel):
-    def __init__(self, parent):
-        wx.Panel.__init__(self, parent, -1)
-
-        box = wx.BoxSizer(wx.VERTICAL)
-        box.Add((20, 30))
-        keys = buttonDefs.keys()
-        #keys.sort()
-        for k in keys:
-            text = buttonDefs[k][1]
-            btn = wx.Button(self, k, text)
-            box.Add(btn, 0, wx.ALIGN_CENTER | wx.ALL, 15)
-            self.Bind(wx.EVT_BUTTON, self.OnButton, btn)
-
-        # With this enabled, you see how you can put a GLCanvas on the wx.Panel
-        if 1:
-            c = CubeCanvas(self)
-            c.SetMinSize((200, 200))
-            box.Add(c, 0, wx.ALIGN_CENTER | wx.ALL, 15)
-
-        self.SetAutoLayout(True)
-        self.SetSizer(box)
-
-    def OnButton(self, evt):
-        if not haveGLCanvas:
-            dlg = wx.MessageDialog(self,
-                                   'The GLCanvas class has not been included with this build of wxPython!',
-                                   'Sorry', wx.OK | wx.ICON_WARNING)
-            dlg.ShowModal()
-            dlg.Destroy()
-
-        elif not haveOpenGL:
-            dlg = wx.MessageDialog(self,
-                                   'The OpenGL package was not found.  You can get it at\n'
-                                   'http://PyOpenGL.sourceforge.net/',
-                                   'Sorry', wx.OK | wx.ICON_WARNING)
-            dlg.ShowModal()
-            dlg.Destroy()
-
-        else:
-            canvasClassName = buttonDefs[evt.GetId()][0]
-            canvasClass = eval(canvasClassName)
-            cx = 0
-            if canvasClassName == 'ConeCanvas': cx = 400
-            frame = wx.Frame(None, -1, canvasClassName, size=(400, 400), pos=(cx, 400))
-            canvasClass(frame)  # CubeCanvas(frame) or ConeCanvas(frame); frame passed to MyCanvasBase
-            frame.Show(True)
-
-
-class MyCanvasBase(glcanvas.GLCanvas):
-    def __init__(self, parent):
-        glcanvas.GLCanvas.__init__(self, parent, -1)
-        self.init = False
-        self.context = glcanvas.GLContext(self)
-
-        # initial mouse position
-        self.lastx = self.x = 30
-        self.lasty = self.y = 30
-        self.size = None
-        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
-        self.Bind(wx.EVT_SIZE, self.OnSize)
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.Bind(wx.EVT_LEFT_DOWN, self.OnMouseDown)
-        self.Bind(wx.EVT_LEFT_UP, self.OnMouseUp)
-        self.Bind(wx.EVT_MOTION, self.OnMouseMotion)
-
-    def OnEraseBackground(self, event):
-        pass  # Do nothing, to avoid flashing on MSW.
-
-    def OnSize(self, event):
-        wx.CallAfter(self.DoSetViewport)
-        event.Skip()
-
-    def DoSetViewport(self):
-        size = self.size = self.GetClientSize()
-        self.SetCurrent(self.context)
-        glViewport(0, 0, size.width, size.height)
-
-    def OnPaint(self, event):
-        dc = wx.PaintDC(self)
-        self.SetCurrent(self.context)
-        if not self.init:
-            self.InitGL()
-            self.init = True
-        self.OnDraw()
-
-    def OnMouseDown(self, evt):
-        self.CaptureMouse()
-        self.x, self.y = self.lastx, self.lasty = evt.GetPosition()
-
-    def OnMouseUp(self, evt):
-        self.ReleaseMouse()
-
-    def OnMouseMotion(self, evt):
-        if evt.Dragging() and evt.LeftIsDown():
-            self.lastx, self.lasty = self.x, self.y
-            self.x, self.y = evt.GetPosition()
-            self.Refresh(False)
-
-
-class CubeCanvas(MyCanvasBase):
-    def InitGL(self):
-        # set viewing projection
         glMatrixMode(GL_PROJECTION)
-        glFrustum(-0.5, 0.5, -0.5, 0.5, 1.0, 3.0)
+        glLoadIdentity()
+        gluPerspective(45.0, self.size[0]/float(self.size[1]), 1, 1000)
 
-        # position viewer
         glMatrixMode(GL_MODELVIEW)
-        glTranslatef(0.0, 0.0, -2.0)
+        glLoadIdentity()
+        gluLookAt(x,y,z, 0,0,0, 0,1,0)
 
-        # position object
-        glRotatef(self.y, 1.0, 0.0, 0.0)
-        glRotatef(self.x, 0.0, 1.0, 0.0)
+    def on_mouse_button (self, b, s, x, y):
+        self.moving = not s
+        self.ex, self.ey = x, y
+        if b in [3, 4]:
+            dz = (1 if b == 3 else -1)
+            self.distance += self.distance/15.0 * dz;
 
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
+    def on_mouse_move(self, x, y, z = 0):
+        if self.moving:            
+            self.rotx += (x-self.ex) / 300.0
+            self.roty += -(y-self.ey) / 300.0
+            self.ex, self.ey = x, y
 
-    def OnDraw(self):
-        # clear color and depth buffers
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    def set_size(self, w, h):
+        self.size = w, h
 
-        # draw six faces of a cube
-        glBegin(GL_QUADS)
-        glNormal3f(0.0, 0.0, 1.0)
-        glVertex3f(0.5, 0.5, 0.5)
-        glVertex3f(-0.5, 0.5, 0.5)
-        glVertex3f(-0.5, -0.5, 0.5)
-        glVertex3f(0.5, -0.5, 0.5)
+class Shader():
+    def __init__(self):
+        self.is_built = False
+        self.uniforms = {}
 
-        glNormal3f(0.0, 0.0, -1.0)
-        glVertex3f(-0.5, -0.5, -0.5)
-        glVertex3f(-0.5, 0.5, -0.5)
-        glVertex3f(0.5, 0.5, -0.5)
-        glVertex3f(0.5, -0.5, -0.5)
+    def build(self):
+        self.program = compileProgram(
+        compileShader('''
+            uniform mat4 camMatrix;
+            uniform mat4 shadowMatrix;
+            varying vec4 depthProjection;
+            uniform bool useShadow;
 
-        glNormal3f(0.0, 1.0, 0.0)
-        glVertex3f(0.5, 0.5, 0.5)
-        glVertex3f(0.5, 0.5, -0.5)
-        glVertex3f(-0.5, 0.5, -0.5)
-        glVertex3f(-0.5, 0.5, 0.5)
+            void main() {
+                gl_Position = camMatrix * gl_ModelViewMatrix * gl_Vertex;
+                depthProjection = shadowMatrix * gl_ModelViewMatrix * gl_Vertex;
+                gl_FrontColor = gl_Color;
+            }
+        ''',GL_VERTEX_SHADER),
+        compileShader('''
+            varying vec4 depthProjection;
+            uniform sampler2D shadowMap;
+            uniform bool useShadow;
 
-        glNormal3f(0.0, -1.0, 0.0)
-        glVertex3f(-0.5, -0.5, -0.5)
-        glVertex3f(0.5, -0.5, -0.5)
-        glVertex3f(0.5, -0.5, 0.5)
-        glVertex3f(-0.5, -0.5, 0.5)
+            void main () {
+                float shadow = 1.0;
+                if (useShadow) {
+                    vec4 shadowCoord = depthProjection / depthProjection.w ;
+                    // shadowCoord.z -= 0.0003;            
+                    float distanceFromLight = texture2D(shadowMap, shadowCoord.st).z;                                
+                    if (depthProjection .w > 0.0)
+                        shadow = distanceFromLight < shadowCoord.z - 0.0001 ? 0.5 : 1.0 ;            
 
-        glNormal3f(1.0, 0.0, 0.0)
-        glVertex3f(0.5, 0.5, 0.5)
-        glVertex3f(0.5, -0.5, 0.5)
-        glVertex3f(0.5, -0.5, -0.5)
-        glVertex3f(0.5, 0.5, -0.5)
+                    }
+                gl_FragColor = shadow * gl_Color;
+              }
+        ''',GL_FRAGMENT_SHADER),)
+        self.is_built = True
 
-        glNormal3f(-1.0, 0.0, 0.0)
-        glVertex3f(-0.5, -0.5, -0.5)
-        glVertex3f(-0.5, -0.5, 0.5)
-        glVertex3f(-0.5, 0.5, 0.5)
-        glVertex3f(-0.5, 0.5, -0.5)
-        glEnd()
+        self.uniforms['camMatrix'] = glGetUniformLocation(self.program, 'camMatrix')
+        self.uniforms['shadowMatrix'] = glGetUniformLocation(self.program, 'shadowMatrix')
+        self.uniforms['shadowMap'] = glGetUniformLocation(self.program, 'shadowMap')
+        self.uniforms['useShadow'] = glGetUniformLocation(self.program, 'useShadow')
+        print(self.uniforms)
 
-        if self.size is None:
-            self.size = self.GetClientSize()
-        w, h = self.size
-        w = max(w, 1.0)
-        h = max(h, 1.0)
-        xScale = 180.0 / w
-        yScale = 180.0 / h
-        glRotatef((self.y - self.lasty) * yScale, 1.0, 0.0, 0.0);
-        glRotatef((self.x - self.lastx) * xScale, 0.0, 1.0, 0.0);
+    def use(self):
+        if not self.is_built:
+            self.build()
+        glUseProgram(self.program)
 
-        self.SwapBuffers()
+class Test:
+    def __init__(self):
+        glutInit(sys.argv)
+        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_ALPHA | GLUT_DEPTH)
+        glutInitWindowSize(800, 600)
+        glutInitWindowPosition(560, 100)
+        self.window = glutCreateWindow("Shadow Test")
+        self.cam = Camera()
+        self.light = Camera()
+        self.cam.set_size(800, 600)
+        self.light.set_size(2048, 2048)
+        self.light.distance = 100
+        self.shader = Shader()
+        self.initialized = False        
 
-
-class ConeCanvas(MyCanvasBase):
-    def InitGL(self):
-        glMatrixMode(GL_PROJECTION)
-        # camera frustrum setup
-        glFrustum(-0.5, 0.5, -0.5, 0.5, 1.0, 3.0)
-        glMaterial(GL_FRONT, GL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
-        glMaterial(GL_FRONT, GL_DIFFUSE, [0.8, 0.8, 0.8, 1.0])
-        glMaterial(GL_FRONT, GL_SPECULAR, [1.0, 0.0, 1.0, 1.0])
-        glMaterial(GL_FRONT, GL_SHININESS, 50.0)
-        glLight(GL_LIGHT0, GL_AMBIENT, [0.0, 1.0, 0.0, 1.0])
-        glLight(GL_LIGHT0, GL_DIFFUSE, [1.0, 1.0, 1.0, 1.0])
-        glLight(GL_LIGHT0, GL_SPECULAR, [1.0, 1.0, 1.0, 1.0])
-        glLight(GL_LIGHT0, GL_POSITION, [1.0, 1.0, 1.0, 0.0])
-        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, [0.2, 0.2, 0.2, 1.0])
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
+    def setup(self):
+        self.initialized = True
+        glClearColor(0,0,0,1.0);
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        # position viewer
-        glMatrixMode(GL_MODELVIEW)
-        # position viewer
-        glTranslatef(0.0, 0.0, -2.0);
-        #
-        glutInit(sys.argv)
 
-    def OnDraw(self):
-        # clear color and depth buffers
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        # use a fresh transformation matrix
+        self.fbo = glGenFramebuffers(1);
+        self.shadowTexture = glGenTextures(1)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
+
+        w, h = self.light.size
+
+        glActiveTexture(GL_TEXTURE5)         
+        glBindTexture(GL_TEXTURE_2D, self.shadowTexture)
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, None)
+
+        glDrawBuffer(GL_NONE)
+        glReadBuffer(GL_NONE)
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.fbo, 0)
+
+        FBOstatus = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        if FBOstatus != GL_FRAMEBUFFER_COMPLETE:
+            print ("GL_FRAMEBUFFER_COMPLETE_EXT failed, CANNOT use FBO\n");
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        #glActiveTexture(GL_TEXTURE0)                
+
+    def draw(self):
         glPushMatrix()
-        # position object
-        # glTranslate(0.0, 0.0, -2.0)
-        glRotate(30.0, 1.0, 0.0, 0.0)
-        glRotate(30.0, 0.0, 1.0, 0.0)
-
-        glTranslate(0, -1, 0)
-        glRotate(250, 1, 0, 0)
-        glutSolidCone(0.5, 1, 30, 5)
+        glTranslate(0, 10 ,0)
+        glColor4f(0, 1, 1, 1)
+        glutSolidCube(5)
         glPopMatrix()
-        glRotatef((self.y - self.lasty), 0.0, 0.0, 1.0);
-        glRotatef((self.x - self.lastx), 1.0, 0.0, 0.0);
-        # push into visible buffer
-        self.SwapBuffers()
 
+        glPushMatrix()
+        glColor4f(0.5, 0.5, .5, 1)
+        glScale(100, 1, 100)
+        glutSolidCube(1)
+        glPopMatrix()
 
-# ----------------------------------------------------------------------
-class RunDemoApp(wx.App):
-    def __init__(self):
-        wx.App.__init__(self, redirect=False)
+    def apply_camera(self, cam):
+        cam.load_matrices()
+        model_view = glGetDoublev(GL_MODELVIEW_MATRIX);
+        projection = glGetDoublev(GL_PROJECTION_MATRIX);
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        glMultMatrixd(projection)
+        glMultMatrixd(model_view)        
+        glUniformMatrix4fv(self.shader.uniforms['camMatrix'], 1, False, glGetFloatv(GL_MODELVIEW_MATRIX))
+        glLoadIdentity()     
 
-    def OnInit(self):
-        frame = wx.Frame(None, -1, "RunDemo: ", pos=(0, 0),
-                         style=wx.DEFAULT_FRAME_STYLE, name="run a sample")
-        # frame.CreateStatusBar()
+    def shadow_pass(self):
+        glUniform1i(self.shader.uniforms['useShadow'], 0)
 
-        menuBar = wx.MenuBar()
-        menu = wx.Menu()
-        item = menu.Append(wx.ID_EXIT, "E&xit\tCtrl-Q", "Exit demo")
-        self.Bind(wx.EVT_MENU, self.OnExitApp, item)
-        menuBar.Append(menu, "&File")
+        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
+        glClear(GL_DEPTH_BUFFER_BIT)
+        glCullFace(GL_BACK)
+        self.apply_camera(self.light)        
+        self.draw()
+        glCullFace(GL_FRONT)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-        frame.SetMenuBar(menuBar)
-        frame.Show(True)
-        frame.Bind(wx.EVT_CLOSE, self.OnCloseFrame)
+    def final_pass(self):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        win = runTest(frame)
+        self.light.load_matrices()
+        model_view = glGetDoublev(GL_MODELVIEW_MATRIX);
+        projection = glGetDoublev(GL_PROJECTION_MATRIX);        
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        bias = [ 0.5, 0.0, 0.0, 0.0, 
+                 0.0, 0.5, 0.0, 0.0,
+                 0.0, 0.0, 0.5, 0.0,
+                 0.5, 0.5, 0.5, 1.0]
+        glLoadMatrixd(bias)
+        glMultMatrixd(projection)
+        glMultMatrixd(model_view)
+        glUniformMatrix4fv(self.shader.uniforms['shadowMatrix'], 1, False, glGetFloatv(GL_MODELVIEW_MATRIX))
 
-        # set the frame to a good size for showing the two buttons
-        frame.SetSize((200, 400))
-        win.SetFocus()
-        self.window = win
-        frect = frame.GetRect()
+        glActiveTexture(GL_TEXTURE5)
+        glBindTexture(GL_TEXTURE_2D, self.shadowTexture)                
+        glUniform1i(self.shader.uniforms['shadowMap'], 5)
 
-        self.SetTopWindow(frame)
-        self.frame = frame
-        return True
+        glUniform1i(self.shader.uniforms['useShadow'], 1);
 
-    def OnExitApp(self, evt):
-        self.frame.Close(True)
+        self.apply_camera(self.cam)
+        glLoadIdentity()
+        glCullFace(GL_BACK)
+        self.draw()
 
-    def OnCloseFrame(self, evt):
-        if hasattr(self, "window") and hasattr(self.window, "ShutdownDemo"):
-            self.window.ShutdownDemo()
-        evt.Skip()
+    def render(self):
+        if not self.initialized: self.setup()
+        self.shader.use()        
+        self.shadow_pass()
+        self.final_pass()        
+        glutSwapBuffers()
 
+    def mouse_move(self, *args):
+        self.cam.on_mouse_move(*args)
+        self.light.on_mouse_move(*args)
 
-def runTest(frame):
-    win = ButtonPanel(frame)
-    return win
+    def mouse_button(self, b, *args):
+        if b==0:
+            self.light.on_mouse_button(b, *args)
+        else:
+            self.cam.on_mouse_button(b, *args)
 
+    def main(self):
+        glutDisplayFunc(self.render)
+        glutIdleFunc(self.render)
+        glutMouseFunc(self.mouse_button)
+        glutMotionFunc(self.mouse_move)
+        glutReshapeFunc(self.cam.set_size)
+        #self.setup()
+        glutMainLoop()
 
-app = RunDemoApp()
-app.MainLoop()
+if __name__ == '__main__':
+    test = Test()
+    test.main()
