@@ -1,27 +1,31 @@
 import numpy as np
 
+
 def lerp(T1, T2, t):
     T = (np.array(T1) * (1.0 - t)) + (np.array(T2) * t)
     return T
 
-def slerp(R1,R2,t):
-    R = (R1.T)@R2
-    if np.arccos((R[0, 0] + R[1, 1] + R[2, 2] - 1)/2) == 0:
+
+def slerp(R1, R2, t):
+    R = (R1.T) @ R2
+    if np.arccos((R[0, 0] + R[1, 1] + R[2, 2] - 1) / 2) == 0:
         ret = R1
-    elif np.dot(t*log(R),t*log(R)) == 0:
+    elif np.dot(t * log(R), t * log(R)) == 0:
         ret = R1
     else:
-        ret = R1@exp(t*log((R1.T)@R2))
+        ret = R1 @ exp(t * log((R1.T) @ R2))
     return ret
 
-def log(R):
-    angl = np.arccos((R[0,0] + R[1,1] + R[2,2] -1)/2)
 
-    v1 = (R[2,1]-R[1,2])/(2*np.sin(angl))
-    v2 = (R[0,2]-R[2,0])/(2*np.sin(angl))
-    v3 = (R[1,0]-R[0,1])/(2*np.sin(angl))
-    r = np.array([v1,v2,v3]) * angl
+def log(R):
+    angl = np.arccos((R[0, 0] + R[1, 1] + R[2, 2] - 1) / 2)
+
+    v1 = (R[2, 1] - R[1, 2]) / (2 * np.sin(angl))
+    v2 = (R[0, 2] - R[2, 0]) / (2 * np.sin(angl))
+    v3 = (R[1, 0] - R[0, 1]) / (2 * np.sin(angl))
+    r = np.array([v1, v2, v3]) * angl
     return r
+
 
 def exp(rv):
     theta = l2norm(rv)
@@ -29,39 +33,44 @@ def exp(rv):
     R = getRotMatFrom(axis, theta)
     return R
 
+
 def l2norm(v):
     return np.sqrt(np.dot(v, v))
 
+
 def normalized(v):
     l = l2norm(v)
-    return 1/l * np.array(v)
+    return 1 / l * np.array(v)
+
 
 def getRotMatFrom(axis, theta):
-    R = np.array([[np.cos(theta) + axis[0]*axis[0]*(1-np.cos(theta)),
-                   axis[0]*axis[1]*(1-np.cos(theta))-axis[2]*np.sin(theta),
-                   axis[0]*axis[2]*(1-np.cos(theta))+axis[1]*np.sin(theta)],
-                  [axis[1]*axis[0]*(1-np.cos(theta))+axis[2]*np.sin(theta),
-                   np.cos(theta)+axis[1]*axis[1]*(1-np.cos(theta)),
-                   axis[1]*axis[2]*(1-np.cos(theta))-axis[0]*np.sin(theta)],
-                  [axis[2]*axis[0]*(1-np.cos(theta))-axis[1]*np.sin(theta),
-                   axis[2]*axis[1]*(1-np.cos(theta))+axis[0]*np.sin(theta),
-                   np.cos(theta)+axis[2]*axis[2]*(1-np.cos(theta))]
-                 ])
+    R = np.array([[np.cos(theta) + axis[0] * axis[0] * (1 - np.cos(theta)),
+                   axis[0] * axis[1] * (1 - np.cos(theta)) - axis[2] * np.sin(theta),
+                   axis[0] * axis[2] * (1 - np.cos(theta)) + axis[1] * np.sin(theta)],
+                  [axis[1] * axis[0] * (1 - np.cos(theta)) + axis[2] * np.sin(theta),
+                   np.cos(theta) + axis[1] * axis[1] * (1 - np.cos(theta)),
+                   axis[1] * axis[2] * (1 - np.cos(theta)) - axis[0] * np.sin(theta)],
+                  [axis[2] * axis[0] * (1 - np.cos(theta)) - axis[1] * np.sin(theta),
+                   axis[2] * axis[1] * (1 - np.cos(theta)) + axis[0] * np.sin(theta),
+                   np.cos(theta) + axis[2] * axis[2] * (1 - np.cos(theta))]
+                  ])
     return R
 
-def change2RotMat(order,data):
+
+def change2RotMat(order, data):
     R = np.identity(3)
     for i in range(len(order)):
         if order[i] == "Xrotation" or order[i] == "XROTATION":
-            Rx = getRotMatFrom([1,0,0],np.radians(data[i]))
+            Rx = getRotMatFrom([1, 0, 0], np.radians(data[i]))
             R = R @ Rx
         elif order[i] == "Yrotation" or order[i] == "YROTATION":
-            Ry = getRotMatFrom([0,1,0], np.radians(data[i]))
+            Ry = getRotMatFrom([0, 1, 0], np.radians(data[i]))
             R = R @ Ry
         elif order[i] == "Zrotation" or order[i] == "ZROTATION":
-            Rz = getRotMatFrom([0,0,1], np.radians(data[i]))
+            Rz = getRotMatFrom([0, 0, 1], np.radians(data[i]))
             R = R @ Rz
     return R
+
 
 def extract_pos(order, data):
     P = []
@@ -73,3 +82,15 @@ def extract_pos(order, data):
         elif order[i] == "Zposition" or order[i] == "ZPOSITION":
             P.append(data[i])
     return P
+
+
+def direction_light_projection_mat(light_source, root_loc):
+    start = np.array(light_source)
+    end = np.array(root_loc)
+    direction_vec = normalized(start - end)
+    t = -end[1] / direction_vec[1]
+    proj_vec_x = np.array([1, 0, 0, t * direction_vec[0]])
+    proj_vec_y = np.array([0, 0, 0, 0])
+    proj_vec_z = np.array([0, 0, 1, t * direction_vec[2]])
+    projection_mat = np.row_stack((proj_vec_x, proj_vec_y, proj_vec_z))
+    return projection_mat

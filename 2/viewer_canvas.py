@@ -5,7 +5,10 @@ from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import numpy as np
 import mesh
+import utility
 from wx.glcanvas import *
+
+import temp
 
 class GLCanvasBase(glcanvas.GLCanvas):
     def __init__(self, parent):
@@ -257,7 +260,7 @@ class Canvas(GLCanvasBase):
 
     def InitGL(self):
 
-        self.light_pos = [0., 130., 0., 1.]
+        self.light_pos = [0., 50., 20., 1.]
         self.glDict = {}
         self.model_list = self.frame.models.model_list
 
@@ -346,13 +349,26 @@ class Canvas(GLCanvasBase):
         self.SwapBuffers()
 
     #model별 그림자
-    def draw_shadow(self, model):
+    def draw_shadow(self, model, light_pos):
         for joint in model.joint:
-            start = np.array([joint.motion_pos[model.frame][0], 0.0001, joint.motion_pos[model.frame][2]])
+            start = np.array(
+                [joint.motion_pos[model.frame][0], joint.motion_pos[model.frame][1], joint.motion_pos[model.frame][2]])
             for child in joint.child:
-                end = np.array([child.motion_pos[model.frame][0], 0.0001, child.motion_pos[model.frame][2]])
+                end = np.array([child.motion_pos[model.frame][0], child.motion_pos[model.frame][1],
+                                child.motion_pos[model.frame][2]])
+
+                #각 관절 별 projection 좌표 구하기
+                projection_mat = np.identity(4)
+                projection_mat[:3, :4] = utility.spot_light_projection_mat(light_pos, start)
+                shadow_start = projection_mat @ np.append(start, np.array([1.]))
+                start = shadow_start[:3]
+                projection_mat = np.identity(4)
+                projection_mat[:3, :4] = utility.spot_light_projection_mat(light_pos, end)
+                shadow_end = projection_mat @ np.append(end, np.array([1.]))
+                end = shadow_end[:3]
+
                 if self.skeleton_view == True:
-                    mesh.draw_mesh("LINE", start= start, end= end)
+                    mesh.draw_mesh("LINE", start=start, end=end)
                 else:
                     parent2child = end - start
                     newy = (parent2child) / np.sqrt((parent2child) @ np.transpose(parent2child))
@@ -366,18 +382,19 @@ class Canvas(GLCanvasBase):
                         rotmat = np.column_stack((rotaxis, newy, newz))
 
                     glPushMatrix()
+
                     glTranslatef(start[0] + parent2child[0] / 2, 0.0001, start[2] + parent2child[2] / 2)
 
                     mat = np.identity(4)
                     mat[:3, :3] = rotmat
                     glMultMatrixf(mat.T)
 
-                    a = child.motion_pos[model.frame][0] - joint.motion_pos[model.frame][0]
-                    b = child.motion_pos[model.frame][2] - joint.motion_pos[model.frame][2]
+                    a = end[0] - start[0]
+                    b = end[2] - start[2]
 
                     mesh.draw_mesh("BOX",
                                    start=np.array([0, 0, 0]),
-                                   end=np.array([a,0,b]),
+                                   end=np.array([a, 0, b]),
                                    glDict=self.glDict, size=joint.scale)
                     glPopMatrix()
 
@@ -400,8 +417,11 @@ class Canvas(GLCanvasBase):
                 #그림자 그리기 위해 lighting 제거
                 glDisable(GL_LIGHTING)
                 glColor3f(0.2, 0.2, 0.2)
+
                 #현재 구현은 단순히 그림자를 xz평면에 각 관절 좌표값을 투영하여 기존 model을 그리듯이 xz 평면 상에 그린 것
-                self.draw_shadow(model)
+                #최소 목표 : 광원에 따른 projection matrix를 구해서 draw_shadow 호출 할 필요 없이
+                #           glMultMatrix 후 draw model 하면 바로 그림자 그려지도록 하기
+                self.draw_shadow(model, self.light_pos)
                 glPopMatrix()
                 glEnable(GL_LIGHTING)
         else:
