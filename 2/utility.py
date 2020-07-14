@@ -95,3 +95,13 @@ def spot_light_projection_mat(light_source, root_loc):
     proj_vec_z = np.array([0, 0, 1, t * direction_vec[2]])
     projection_mat = np.row_stack((proj_vec_x, proj_vec_y, proj_vec_z))
     return projection_mat
+
+def direction_light_projection_mat(light_source, root_loc):
+    start = np.array(light_source[:3])
+    end = np.array(root_loc)
+    direction_vec = normalized(start-end)
+    proj_vec_x = np.array([1, -direction_vec[0]/direction_vec[1], 0, 0])
+    proj_vec_y = np.array([0, 0, 0, 0.001])
+    proj_vec_z = np.array([0, -direction_vec[2]/direction_vec[1], 1, 0])
+    projection_mat = np.row_stack((proj_vec_x, proj_vec_y, proj_vec_z))
+    return projection_mat

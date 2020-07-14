@@ -417,18 +417,31 @@ class Canvas(GLCanvasBase):
                 #그림자 그리기 위해 lighting 제거
                 glDisable(GL_LIGHTING)
                 glColor3f(0.2, 0.2, 0.2)
-
+                #====================================================================================
                 #현재 구현은 단순히 그림자를 xz평면에 각 관절 좌표값을 투영하여 기존 model을 그리듯이 xz 평면 상에 그린 것
                 #최소 목표 : 광원에 따른 projection matrix를 구해서 draw_shadow 호출 할 필요 없이
                 #           glMultMatrix 후 draw model 하면 바로 그림자 그려지도록 하기
-                self.draw_shadow(model, self.light_pos)
+                #가능하면 shadow map 같은 거 써서 구현할 수 있도록 해 보기? 
+
+                # 1. spot light 환경에서 각 관절 별 projection 좌표 구해서 hierarchical하게 하나하나 그리는 방식
+                #(spot light : 광원에서 나온 빛이 방사형으로 쏘아져 각 부분별로 다르게 projection)
+                #self.draw_shadow(model, self.light_pos)
+                #=====================================================================================
+                # 2. direction light 환경에서 light source 좌표와 root 좌표가 이루는 vector를 light direction으로 정해서 projection
+                # (direction light : 이론상 광원이 무한대 떨어진 거리에 위치하여 모든 vertex가 동일한 direction의 빛을 받는다 가정)
+                projection = np.identity(4)
+                projection[:3, :4] = utility.direction_light_projection_mat(self.light_pos,
+                                                                            root.motion_pos[model.frame])
+                glMultMatrixf(projection.T)
+                self.draw_bvh_motion(root, shadow= True)
+                #=====================================================================================
                 glPopMatrix()
                 glEnable(GL_LIGHTING)
         else:
             glColor3f(0.95, 0.95, 0.95)
             mesh.drawBox()
 
-    def draw_bvh_motion(self, nowsee):
+    def draw_bvh_motion(self, nowsee, shadow = False):
         M = np.identity(4)
         if len(nowsee.child) != 0:
             rot_matrix = nowsee.motion_rot[nowsee.model.frame]
@@ -447,7 +460,7 @@ class Canvas(GLCanvasBase):
                 end = np.array(child.offset)
 
                 # draw skeleton
-                if self.skeleton_view == True:
+                if self.skeleton_view == True and shadow == False:
                     if nowsee.model.focused == True:
                         glColor3f(0.9, 0.3, 0.3)
                     elif nowsee.model.pinned == True:
@@ -475,14 +488,14 @@ class Canvas(GLCanvasBase):
                     glMultMatrixf(mat.T)
 
                     #재생 조작 선택 대상 윤곽선 그리기
-                    if nowsee.model.focused == True:
+                    if nowsee.model.focused == True and shadow == False:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
                         glColor3f(0.9, 0.3, 0.3)
-                    elif nowsee.model.pinned == True:
+                    elif nowsee.model.pinned == True and shadow == False:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
                         glColor3f(0.3, 0.9, 0.3)
                     mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=nowsee.scale)
-                    if self.frame_view == False:
+                    if self.frame_view == False and shadow == False:
                         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
                         glColor3f(0.5, 0.5, 0.5)
                         mesh.draw_mesh("BOX", start=start, end=end, glDict=self.glDict, size=nowsee.scale)
@@ -492,7 +505,7 @@ class Canvas(GLCanvasBase):
             glPopMatrix()
 
             for child in nowsee.child:
-                self.draw_bvh_motion(child)
+                self.draw_bvh_motion(child, shadow)
 
             glPopMatrix()
 
